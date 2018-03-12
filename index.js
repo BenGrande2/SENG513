@@ -13,6 +13,7 @@ var users = {};
 var messages = [];
 var usernames = [];
 var userIds = [];
+var userHashes = {};
 var activeUsers = [];
 app.get('/css/*', function(req, res) {
 	res.sendFile(__dirname +"/public"+ req.url);
@@ -34,10 +35,21 @@ app.get('/', function(req, res){
 	// Note: very insecure, as someone could easily spoof their id to someone elses.
 	// Prof mentioned in lecture that we did not need to worry about security
 	// User Id's simply increment like they would in a DB
-	if (req.cookies["userID"] == null) {
-		res.cookie ("userID", userIds.length, { maxAge: 60 * 60 * 1000 });
-		userIds.push(userIds.length);
+	var uid = req.cookies["userID"]
+	var userHash = req.cookies["userHash"];
+	if (userHash == null || (uid != null && userHashes[uid] != userHash)) {
+		uid = null;
+		userHash = Math.random().toString(36).substring(7);
 	}
+	if (uid == null) {
+		uid = userIds.length;
+		res.cookie ("userID", uid, { maxAge: 60 * 60 * 1000 });
+		res.cookie ("userHash", userHash, { maxAge: 60 * 60 * 1000 });
+		userIds.push(uid);
+		userHashes[uid] = userHash;
+		
+	}
+
 	
 	res.sendFile(__dirname + '/index.html');
 });
