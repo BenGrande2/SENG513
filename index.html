@@ -1,0 +1,218 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Hello World 2.0</title>
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+    <link rel="stylesheet" type="text/css" href="/css/style.css">
+  </head>
+  <body>
+	  <div id="body">
+			
+		  	<ul id="messages"></ul>
+			<form action="" id="new-message">
+				<ul id="top-toolbar">
+					<li id="changenickname">Change Nickname</li>
+					<li id="changecolor">Change Message Color</li>
+				</ul>
+				
+				<input id="m" autocomplete="off" />
+				<button>Send</button>
+			</form>
+			<div class="w3-dropdown-hover" id="users">
+				<button class="w3-button">Active Users</button>
+				<div class="w3-dropdown-content w3-bar-block w3-border" id="online-users">
+				</div>
+			</div>
+		 	<!--<form action="" id="create-username">
+			 	<h1>Hi. What's your name?</h1>
+		      <input id="username" autocomplete="off" placeholder="Name"/>
+		      <button>Join</button>
+		    </form>-->
+	  </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+    <script>
+	    var socket;
+		/*$(function () {
+			socket = io();
+			$("#create-username").submit(function() {
+				socket.emit('send-nickname', $("#username").val());
+				$.ajax({
+					url: "/messages"	
+				}).done(function(data) {
+					$('#body').html(data);
+				});
+				return false;
+			});
+			
+			
+		});*/
+		
+		$(function() {
+			var username = "";
+			var color = "";
+			var activeUsers = {};
+			var userID = -1;
+			function updateColor() {
+				$("#changecolor").html("Color: "+color);
+			}
+			function updateUsername(name) {
+				username = name;
+				$("#changenickname").html("Name: "+name);
+			}
+			function updateActiveUsers() {
+				//console.log(activeUsers);
+				var users = "";
+				console.log(activeUsers);
+				for (var i in activeUsers) {
+					var us = activeUsers[i];
+					var clss = "w3-bar-item w3-button";
+					if (i == userID) {
+						us = "You: "+us;
+						clss += " self";
+					}
+					users += `<a href="#" class="`+clss+`">`+us+`</a>`;
+				}
+				$("#online-users").html(users);
+				
+			}
+			$("#changenickname").click(function() {
+				$("#m").val("/nick ");
+				$("#m").focus();
+			});
+			$("#changecolor").click(function() {
+				$("#m").val("/nickcolor ");
+				$("#m").focus();
+			});
+			socket = io();
+			var lastDayPosted = "";
+			
+			$('#new-message').submit(function(){
+				var mess = $('#m').val();
+				var data = {
+					message: mess,
+					sid: socket.id
+				};
+				var event = 'chat message';
+				if (mess.indexOf("/nickcolor ") == 0) {
+					color = mess.replace("/nickcolor ", "");
+					updateColor();
+					data = {
+						'color': color,
+					};
+					event = 'change nickcolor';
+				}
+				else if (mess.indexOf("/nick ") == 0) {
+					var name = mess.replace("/nick ", "");
+					data = name;
+					
+					event = 'send-nickname';
+				}
+				
+				socket.emit(event, data);
+				$('#m').val('');
+				return false;
+			});
+			socket.on('chat message', function(msg){
+				var message = '<div class="mess">';
+				if (msg.color != null) {
+					message = "<div class='mess' style='background: "+msg.color+"'>";
+				}
+				var date = new Date(msg["time"]);
+				
+				var components = (""+date).split(" ");
+				var ds = components[4];
+				var curDay = components[0]+" "+components[1]+" "+components[2]+" "+components[3];
+				if (curDay != lastDayPosted) {
+					
+					$('#messages').append($('<li class="time-message">').html(curDay));
+					$("#messages").scrollTop($("#messages")[0].scrollHeight);
+					lastDayPosted = curDay;
+				}
+				message = message+msg.message+'</div><div class="info">'+ds+": "+msg.sender+'</div>';
+				var clss = 'other-message';
+				if (msg.uid == userID) {
+					clss="self-message";
+				}
+				
+				$('#messages').append($('<li class="'+clss+' message">').html(message));
+				$("#messages").scrollTop($("#messages")[0].scrollHeight);
+			});
+			socket.on('user-joined', function(join) {
+				var name = join.name+" has";
+				if (join.sid == socket.id) {
+					userID = join.uid;
+					name = "You have";
+					updateUsername(join.name);
+					// Wait until we have the username, then get all messages
+					$.ajax({
+						url: "/status"	
+					}).done(function(data) {
+						for (var i in data["users"]) {
+							activeUsers[data["users"][i]["uid"]] = data["users"][i]["name"];
+						}
+						
+						updateActiveUsers();
+						for (var i in data["messages"]) {
+
+							var msg = data["messages"][i];
+							var message = '<div class="mess">';
+							if (msg.color != null) {
+								message = "<div class='mess' style='background: "+msg.color+"'>";
+							}
+							var date = new Date(msg["time"]);
+				
+							var components = (""+date).split(" ");
+							var ds = components[4];
+							var curDay = components[0]+" "+components[1]+" "+components[2]+" "+components[3];
+							if (curDay != lastDayPosted) {
+								
+								$('#messages').append($('<li class="time-message">').html(curDay));
+								$("#messages").scrollTop($("#messages")[0].scrollHeight);
+								lastDayPosted = curDay;
+							}
+							message = message+msg.message+'</div><div class="info">'+ds+": "+msg.sender+'</div>';
+							var clss = 'other-message';
+							if (msg.uid == userID) {
+								clss="self-message";
+							}
+							
+							$('#messages').append($('<li class="'+clss+' message">').html(message));
+							$("#messages").scrollTop($("#messages")[0].scrollHeight);
+						}
+					});
+				}
+				activeUsers[join.uid] = join.name;
+				var message = '<div>'+name+' joined the chat</div>';
+				$('#messages').append($('<li class="join-message">').html(message));
+				$("#messages").scrollTop($("#messages")[0].scrollHeight);
+				updateActiveUsers();
+				
+			});
+			socket.on('user-left', function(left) {
+				
+				var message = '<div>'+left.name+' has left the chat</div>';
+				console.log(left);
+				activeUsers[left.uid] = null;
+				delete activeUsers[left.uid];
+				
+				$('#messages').append($('<li class="left-message">').html(message));
+				$("#messages").scrollTop($("#messages")[0].scrollHeight);
+				updateActiveUsers();
+			});
+			socket.on('user-renamed', function(change) {
+				activeUsers[change.uid] = change.name;
+				var message = '<div>'+change.oldname+' has changed his/her name to '+change.name+'</div>';
+				if (change.sid == socket.id) {
+					var message = '<div>You have changed your name to '+change.name+'</div>';
+					updateUsername(change.name);
+				}
+				$('#messages').append($('<li class="left-message">').html(message));
+				$("#messages").scrollTop($("#messages")[0].scrollHeight);
+				updateActiveUsers();
+			});
+		});
+    </script>
+  </body>
+</html>
